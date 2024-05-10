@@ -4,7 +4,10 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
@@ -104,8 +107,10 @@ class DownloadsFragment : MainFragment() {
         private val _listDownloadedMeta: TextView;
         private val _listDownloaded: AnyInsertedAdapterView<VideoLocal, VideoDownloadViewHolder>;
 
+        var sortBy = 0;
+
         constructor(frag: DownloadsFragment, inflater: LayoutInflater): super(frag.requireContext()) {
-            inflater.inflate(R.layout.fragment_downloads, this);
+            inflater.inflate(R.layout.fragment_downloads, this, true);
             _frag = frag;
 
             _usageUsed = findViewById(R.id.downloads_usage_used);
@@ -123,6 +128,25 @@ class DownloadsFragment : MainFragment() {
             _listDownloadedHeader = findViewById(R.id.downloads_videos_header);
             _listDownloadedMeta = findViewById(R.id.downloads_videos_meta);
 
+            val spinnerSortBy: Spinner = findViewById(R.id.spinner_sortby)
+            spinnerSortBy.adapter = ArrayAdapter(context, R.layout.spinner_item_simple, resources.getStringArray(R.array.downloads_sortby_array)).also {
+                it.setDropDownViewResource(R.layout.spinner_dropdownitem_simple)
+            }
+            spinnerSortBy.setSelection(sortBy)
+            spinnerSortBy.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+                    sortBy = position
+                    reloadUI() // HACK move this shit to an adapter
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) { }
+            };
+
             _listDownloaded = findViewById<RecyclerView>(R.id.list_downloaded)
                 .asAnyWithTop(findViewById(R.id.downloads_top)) {
                     it.onClick.subscribe {
@@ -130,7 +154,6 @@ class DownloadsFragment : MainFragment() {
                         _frag.navigate<VideoDetailFragment>(it).maximizeVideoDetail();
                     }
                 };
-
 
             reloadUI();
         }
@@ -146,8 +169,15 @@ class DownloadsFragment : MainFragment() {
             val activeDownloads = StateDownloads.instance.getDownloading();
             val playlists = StateDownloads.instance.getCachedPlaylists();
             val watchLaterDownload = StateDownloads.instance.getWatchLaterDescriptor();
-            val downloaded = StateDownloads.instance.getDownloadedVideos()
-                .filter { it.groupType != VideoDownload.GROUP_PLAYLIST || it.groupID == null || !StateDownloads.instance.hasCachedPlaylist(it.groupID!!) };
+            val downloadedUnordered = StateDownloads.instance.getDownloadedVideosTemporal()
+                .filter { it.inner.groupType != VideoDownload.GROUP_PLAYLIST || it.inner.groupID == null || !StateDownloads.instance.hasCachedPlaylist(it.inner.groupID!!) };
+            val downloaded = when (sortBy) {
+                0 -> downloadedUnordered.sortedByDescending { it.createdAt }
+                1 -> downloadedUnordered.sortedBy { it.createdAt }
+                2 -> downloadedUnordered.sortedBy { it.inner.name }
+                3 -> downloadedUnordered.sortedByDescending { it.inner.name }
+                else -> throw IllegalStateException("Invalid sorting algorithm selected.")
+            }.map { it.inner }
 
             if(activeDownloads.isEmpty())
                 _listActiveDownloadsContainer.visibility = GONE;
