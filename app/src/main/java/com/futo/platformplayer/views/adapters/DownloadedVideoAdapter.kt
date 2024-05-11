@@ -19,10 +19,10 @@ import com.futo.platformplayer.fragment.mainactivity.main.DownloadsFragment
 import com.futo.platformplayer.fragment.mainactivity.main.VideoDetailFragment
 import com.futo.platformplayer.states.StateDownloads
 import com.futo.platformplayer.states.StatePlayer
-import com.futo.platformplayer.views.adapters.viewholders.VideoDownloadViewHolder
+import com.futo.platformplayer.views.adapters.viewholders.DownloadedVideoViewHolder
 
-class VideoDownloadAdapter(frag: DownloadsFragment, view: View) :
-    RecyclerView.Adapter<VideoDownloadViewHolder>() {
+class DownloadedVideoAdapter(frag: DownloadsFragment, view: View) :
+    RecyclerView.Adapter<DownloadedVideoViewHolder>() {
 
     private val _containerHeader: LinearLayout;
     private val _meta: TextView;
@@ -38,7 +38,11 @@ class VideoDownloadAdapter(frag: DownloadsFragment, view: View) :
     var sortBy = 0
         set(value) { field = value; updateDataset() };
     var query: String? = null
-        set(value) { field = value; updateDataset() };
+        set(value) {
+            field = value;
+            updateDataset();
+            updateContainer();
+        };
 
     init {
         _containerHeader = _view.findViewById(R.id.downloads_videos_header)
@@ -81,8 +85,8 @@ class VideoDownloadAdapter(frag: DownloadsFragment, view: View) :
 
     val sourceCount get() = _originalDataset.size;
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VideoDownloadViewHolder {
-        val holder = VideoDownloadViewHolder(parent);
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DownloadedVideoViewHolder {
+        val holder = DownloadedVideoViewHolder(parent);
         holder.onClick.subscribe {
             StatePlayer.instance.clearQueue();
             _frag.navigate<VideoDetailFragment>(it).maximizeVideoDetail();
@@ -90,7 +94,7 @@ class VideoDownloadAdapter(frag: DownloadsFragment, view: View) :
         return holder;
     }
 
-    override fun onBindViewHolder(holder: VideoDownloadViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: DownloadedVideoViewHolder, position: Int) {
         holder.bind(_filteredDataset[position])
     }
     

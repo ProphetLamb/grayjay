@@ -15,7 +15,7 @@ import com.futo.platformplayer.models.Playlist
 import com.futo.platformplayer.states.StateDownloads
 import com.futo.platformplayer.states.StatePlaylists
 import com.futo.platformplayer.toHumanBytesSize
-import com.futo.platformplayer.views.adapters.VideoDownloadAdapter
+import com.futo.platformplayer.views.adapters.DownloadedVideoAdapter
 import com.futo.platformplayer.views.items.ActiveDownloadItem
 import com.futo.platformplayer.views.items.PlaylistDownloadItem
 import com.futo.platformplayer.views.others.ProgressBar
@@ -80,7 +80,7 @@ class DownloadsFragment : MainFragment() {
         private val _listPlaylistsMeta: TextView;
         private val _listPlaylists: LinearLayout;
 
-        private val _listDownloaded: VideoDownloadAdapter
+        private val _listDownloaded: DownloadedVideoAdapter
 
         init {
             inflater.inflate(R.layout.fragment_downloads, this, true)
@@ -93,7 +93,7 @@ class DownloadsFragment : MainFragment() {
             _listPlaylistsContainer = findViewById(R.id.downloads_playlist_container)
             _listPlaylistsMeta = findViewById(R.id.downloads_playlist_meta)
             _listPlaylists = findViewById(R.id.downloads_playlist_list)
-            _listDownloaded = VideoDownloadAdapter(_frag, this)
+            _listDownloaded = DownloadedVideoAdapter(_frag, this)
 
             val listDownloadsView = findViewById<RecyclerView>(R.id.list_downloaded);
             listDownloadsView.adapter = _listDownloaded

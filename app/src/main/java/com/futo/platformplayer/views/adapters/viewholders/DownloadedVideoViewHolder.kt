@@ -18,7 +18,7 @@ import com.futo.platformplayer.states.StatePlayer
 import com.futo.platformplayer.views.adapters.AnyAdapter
 
 
-class VideoDownloadViewHolder(_viewGroup: ViewGroup) : AnyAdapter.AnyViewHolder<VideoLocal>(
+class DownloadedVideoViewHolder(_viewGroup: ViewGroup) : AnyAdapter.AnyViewHolder<VideoLocal>(
     LayoutInflater.from(_viewGroup.context).inflate(R.layout.list_downloaded, _viewGroup, false)) {
     private var _video: VideoLocal? = null;
 
