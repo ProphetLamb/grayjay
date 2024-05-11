@@ -1,8 +1,6 @@
 ﻿package com.futo.platformplayer.views.adapters
 
 import android.view.View
-import android.view.View.GONE
-import android.view.View.VISIBLE
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -17,7 +15,6 @@ import com.futo.platformplayer.views.adapters.viewholders.DownloadedPlaylistView
 class DownloadedPlaylistAdapter(frag: DownloadsFragment, view: View) : DownloadFilterableAdapter<PlaylistDownloadedOrWatchlist, DownloadedPlaylistViewHolder>(frag, view)  {
     private val _listPlaylistsContainer: LinearLayout = view.findViewById(R.id.downloads_playlist_container)
     private val _meta: TextView = view.findViewById(R.id.downloads_playlist_meta)
-    private val _listPlaylists: LinearLayout = view.findViewById(R.id.downloads_playlist_list)
 
     init {
         StateDownloads.instance.onDownloadedChanged.subscribe {
@@ -29,13 +26,13 @@ class DownloadedPlaylistAdapter(frag: DownloadsFragment, view: View) : DownloadF
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DownloadedPlaylistViewHolder {
-        val holder = DownloadedPlaylistViewHolder(parent)
+        val holder = DownloadedPlaylistViewHolder(parent, _frag)
         return holder
     }
 
     override fun updateContainer() {
-        _listPlaylistsContainer.visibility = if (itemCount == 0) { GONE } else { VISIBLE }
-        val countText = if (sourceCount == itemCount) "${sourceCount}" else "${sourceCount} / ${itemCount}"
+        _listPlaylistsContainer.visibility = if (itemCount == 0 && query.isNullOrBlank()) View.GONE else View.VISIBLE
+        val countText = if (sourceCount == itemCount) "${sourceCount}" else "${itemCount} / ${sourceCount}"
         _meta.text = "(${countText} ${_view.context.getString(R.string.playlists).lowercase()}, ${_filteredDataset.sumOf { it.videos.size }} ${_view.context.getString(R.string.videos).lowercase()})"
     }
 

@@ -16,17 +16,12 @@ import com.futo.platformplayer.views.adapters.viewholders.DownloadedVideoViewHol
 
 class DownloadedVideoAdapter(frag: DownloadsFragment, view: View) :
     DownloadFilterableAdapter<VideoLocal, DownloadedVideoViewHolder>(frag, view) {
-    private val _containerHeader: LinearLayout
-    private val _containerSortBy: LinearLayout
-    private val _containerSearch: FrameLayout
-    private val _meta: TextView
+    private val _containerHeader: LinearLayout = _view.findViewById(R.id.downloads_videos_header)
+    private val _containerSortBy: LinearLayout = _view.findViewById(R.id.sortby_container)
+    private val _containerSearch: FrameLayout = _view.findViewById(R.id.container_search)
+    private val _meta: TextView = _view.findViewById(R.id.downloads_videos_meta)
 
     init {
-        _containerHeader = _view.findViewById(R.id.downloads_videos_header)
-        _containerSortBy = _view.findViewById(R.id.sortby_container)
-        _containerSearch = _view.findViewById(R.id.container_search)
-        _meta = _view.findViewById(R.id.downloads_videos_meta)
-
         StateDownloads.instance.onDownloadedChanged.subscribe {
             updateDataset()
             updateContainer()
@@ -49,18 +44,12 @@ class DownloadedVideoAdapter(frag: DownloadsFragment, view: View) :
     }
     
     override fun updateContainer() {
-        if(sourceCount == 0) {
-            _containerHeader.visibility = LinearLayout.GONE
-            _containerSearch.visibility = LinearLayout.GONE
-            _containerSortBy.visibility = LinearLayout.GONE
-        } else {
-            _containerHeader.visibility = LinearLayout.VISIBLE
-            _containerSearch.visibility = LinearLayout.VISIBLE
-            _containerSortBy.visibility = LinearLayout.VISIBLE
-
-            val countText = if (sourceCount == itemCount) "${sourceCount}" else "${sourceCount} / ${itemCount}"
-            _meta.text = "(${countText} ${_view.context.getString(R.string.videos).lowercase()})"
-        }
+        val searchVisibility = if (itemCount == 0 && query.isNullOrBlank()) View.GONE else View.VISIBLE
+        _containerHeader.visibility = searchVisibility
+        _containerSearch.visibility = searchVisibility
+        _containerSortBy.visibility = searchVisibility
+        val countText = if (sourceCount == itemCount) "${sourceCount}" else "${itemCount} / ${sourceCount}"
+        _meta.text = "(${countText} ${_view.context.getString(R.string.videos).lowercase()})"
     }
 
     override fun updateDataset() {
@@ -72,7 +61,7 @@ class DownloadedVideoAdapter(frag: DownloadsFragment, view: View) :
             downloadedTemporal = downloadedTemporal
                 .filter { it.inner.name.contains(query, true)
                     || it.inner.description.contains(query, true)
-                    || it.inner.author.name.contains(query, true)  }
+                    || it.inner.author.name.contains(query, true) }
         }
         _filteredDataset = when (sortBy) {
             0 -> downloadedTemporal.sortedByDescending { it.createdAt }
