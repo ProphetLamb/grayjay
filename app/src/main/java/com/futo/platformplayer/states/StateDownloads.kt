@@ -109,10 +109,13 @@ class StateDownloads {
         return _downloadPlaylists.getItems().find { it.inner.id == VideoDownload.GROUP_WATCHLATER };
     }
     fun getCachedPlaylists(): List<PlaylistDownloaded> {
+        return getCachedPlaylistsTemporal().map { it.inner }
+    }
+    fun getCachedPlaylistsTemporal(): List<TemporalItem<PlaylistDownloaded>> {
         return _downloadPlaylists.getItems()
             .map { Pair(it, StatePlaylists.instance.getPlaylist(it.inner.id)) }
             .filter { it.second != null }
-            .map { PlaylistDownloaded(it.first.inner, it.second!!) }
+            .map { TemporalItem(PlaylistDownloaded(it.first.inner, it.second!!), it.first.createdAt) }
             .toList();
     }
     fun hasCachedPlaylist(playlistId: String): Boolean {
