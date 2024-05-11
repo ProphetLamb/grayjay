@@ -6,9 +6,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
+import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -88,6 +91,8 @@ class DownloadsFragment : MainFragment() {
         private val _listDownloadedHeader: LinearLayout;
         private val _listDownloadedMeta: TextView;
         private val _listDownloadsFilterContainer: LinearLayout
+        private val _containerSearch: FrameLayout
+        private val _editSearch: EditText
         private val _listDownloaded: VideoDownloadAdapter
 
         init {
@@ -105,6 +110,9 @@ class DownloadsFragment : MainFragment() {
             _listDownloadedMeta = findViewById(R.id.downloads_videos_meta)
             _listDownloadsFilterContainer = findViewById(R.id.downloads_videos_filter_container)
             _listDownloaded = VideoDownloadAdapter(_frag, inflater)
+
+            _containerSearch = findViewById(R.id.container_search);
+            _editSearch = findViewById(R.id.edit_search);
             val spinnerSortBy: Spinner = findViewById(R.id.spinner_sortby)
             spinnerSortBy.adapter = ArrayAdapter(context, R.layout.spinner_item_simple, resources.getStringArray(R.array.downloads_sortby_array)).also {
                 it.setDropDownViewResource(R.layout.spinner_dropdownitem_simple)
@@ -122,6 +130,11 @@ class DownloadsFragment : MainFragment() {
 
                 override fun onNothingSelected(parent: AdapterView<*>?) { }
             }
+
+            _editSearch.addTextChangedListener {
+                _listDownloaded.query = it.toString()
+            }
+
             val listDownloadsView = findViewById<RecyclerView>(R.id.list_downloaded);
             listDownloadsView.adapter = _listDownloaded
             listDownloadsView.layoutManager = LinearLayoutManager(context)
@@ -176,11 +189,13 @@ class DownloadsFragment : MainFragment() {
                 }
             }
 
-            if(_listDownloaded.itemCount == 0) {
+            if(_listDownloaded.sourceCount == 0) {
                 _listDownloadedHeader.visibility = GONE;
+                _containerSearch.visibility = GONE;
                 _listDownloadsFilterContainer.visibility = GONE;
             } else {
                 _listDownloadedHeader.visibility = VISIBLE;
+                _containerSearch.visibility = VISIBLE;
                 _listDownloadsFilterContainer.visibility = VISIBLE;
 
                 val countText = if (_listDownloaded.sourceCount == _listDownloaded.itemCount) "${_listDownloaded.sourceCount}" else "${_listDownloaded.sourceCount} / ${_listDownloaded.itemCount}";
