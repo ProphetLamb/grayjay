@@ -105,6 +105,7 @@ class DownloadsFragment : MainFragment() {
 
         private val _listDownloadedHeader: LinearLayout;
         private val _listDownloadedMeta: TextView;
+        private val _listDownloadsFilterContainer: LinearLayout
         private val _listDownloaded: AnyInsertedAdapterView<VideoLocal, VideoDownloadViewHolder>;
 
         var sortBy = 0;
@@ -127,6 +128,7 @@ class DownloadsFragment : MainFragment() {
 
             _listDownloadedHeader = findViewById(R.id.downloads_videos_header);
             _listDownloadedMeta = findViewById(R.id.downloads_videos_meta);
+            _listDownloadsFilterContainer = findViewById(R.id.downloads_videos_filter_container)
 
             val spinnerSortBy: Spinner = findViewById(R.id.spinner_sortby)
             spinnerSortBy.adapter = ArrayAdapter(context, R.layout.spinner_item_simple, resources.getStringArray(R.array.downloads_sortby_array)).also {
@@ -219,8 +221,10 @@ class DownloadsFragment : MainFragment() {
 
             if(downloaded.isEmpty()) {
                 _listDownloadedHeader.visibility = GONE;
+                _listDownloadsFilterContainer.visibility = GONE;
             } else {
                 _listDownloadedHeader.visibility = VISIBLE;
+                _listDownloadsFilterContainer.visibility = VISIBLE;
                 _listDownloadedMeta.text = "(${downloaded.size} ${context.getString(R.string.videos).lowercase()})";
             }
 
