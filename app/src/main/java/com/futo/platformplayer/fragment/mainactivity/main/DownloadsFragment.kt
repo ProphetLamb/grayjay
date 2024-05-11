@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -75,6 +74,10 @@ class DownloadsFragment : MainFragment() {
             inflater.inflate(R.layout.fragment_downloads, this, true)
         }
 
+        private val _toggleStorageInfo: ImageButton = findViewById(R.id.button_toggle_storage_info)
+        private val _containerStorageInfo: LinearLayout = findViewById(R.id.container_storage_info)
+        private var _toggleStorageInfoActive = true
+
         private val _clearSearch: ImageButton = findViewById(R.id.button_clear_search)
         private val _editSearch: EditText = findViewById(R.id.edit_search)
 
@@ -97,6 +100,13 @@ class DownloadsFragment : MainFragment() {
             listDownloadsView.adapter = _listDownloaded
             listDownloadsView.layoutManager = LinearLayoutManager(context)
             reloadUI()
+
+            _toggleStorageInfo.setOnClickListener {
+                val toggled = !_toggleStorageInfoActive
+                _toggleStorageInfoActive = toggled
+                _containerStorageInfo.visibility = if (toggled) VISIBLE else GONE
+            }
+            _toggleStorageInfo.callOnClick()
 
             _editSearch.addTextChangedListener {
                 _clearSearch.visibility = if (it.isNullOrBlank()) View.GONE else View.VISIBLE
