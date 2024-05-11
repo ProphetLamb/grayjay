@@ -195,7 +195,7 @@
         </FrameLayout>
 
         <LinearLayout
-                android:id="@+id/downloads_videos_filter_container"
+                android:id="@+id/sortby_container"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:gravity="center_vertical">
