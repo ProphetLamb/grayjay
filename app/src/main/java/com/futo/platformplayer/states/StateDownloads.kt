@@ -40,19 +40,24 @@ class StateDownloads {
     private val _downloadsDirectory: File = FragmentedStorage.getOrCreateDirectory("downloads");
     private val _downloadsStat = StatFs(_downloadsDirectory.absolutePath);
 
-    private val _downloaded = FragmentedStorage.storeJson<TemporalItem<VideoLocal>>("downloaded")
+    private val _downloaded = FragmentedStorage.storeJson<TemporalItem<VideoLocal>>("downloaded-v2")
         .load()
-        .apply { afterLoadingDownloaded(this) };
-    private val _downloading = FragmentedStorage.storeJson<TemporalItem<VideoDownload>>("downloading")
-        .load().apply {
+        .apply { this.consume(FragmentedStorage.storeJson<VideoLocal>("downloaded").load()) { TemporalItem.now(it) } }
+        .apply { afterLoadingDownloaded(this) }
+    private val _downloading = FragmentedStorage.storeJson<TemporalItem<VideoDownload>>("downloading-v2")
+        .load()
+        .apply { this.consume(FragmentedStorage.storeJson<VideoDownload>("downloading").load()) { TemporalItem.now(it) } }
+        .apply {
             for(video in this.getItems())
                 video.inner.changeState(VideoDownload.State.QUEUED);
         };
-    private val _downloadPlaylists = FragmentedStorage.storeJson<TemporalItem<PlaylistDownloadDescriptor>>("playlistDownloads")
-        .load();
+    private val _downloadPlaylists = FragmentedStorage.storeJson<TemporalItem<PlaylistDownloadDescriptor>>("playlistDownloads-v2")
+        .load()
+        .apply { this.consume(FragmentedStorage.storeJson<PlaylistDownloadDescriptor>("playlistDownloads").load()) { TemporalItem.now(it) } };
 
-    private val _exporting = FragmentedStorage.storeJson<TemporalItem<VideoExport>>("exporting")
-        .load();
+    private val _exporting = FragmentedStorage.storeJson<TemporalItem<VideoExport>>("exporting-v2")
+        .load()
+        .apply { this.consume(FragmentedStorage.storeJson<VideoExport>("exporting").load()) { TemporalItem.now(it) } };
 
     private lateinit var _downloadedSet: HashSet<PlatformID>;
 
@@ -557,7 +562,6 @@ class StateDownloads {
             }
         }
     }
-
 
     fun removeExport(export: VideoExport) {
         _exporting.delete(TemporalItem.undefined(export));
