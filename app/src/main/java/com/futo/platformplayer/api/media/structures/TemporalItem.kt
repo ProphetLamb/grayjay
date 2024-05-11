@@ -7,7 +7,7 @@ import kotlinx.serialization.json.Json
 import java.time.OffsetDateTime
 
 /**
- * `IStoreItem` created and deleted at a specific time
+ * `IStoreItem` created and deleted at a specific time, decorating the inner object.
  *
  *  Delegates equality comparisons to the inner object.
  *  Bubbles `onDelete` to the inner `IStoreItem`
@@ -19,7 +19,7 @@ import java.time.OffsetDateTime
  *  @sample TemporalItem.undefined("Hello Mom");
  */
 @kotlinx.serialization.Serializable
-class TemporalItem<T: Any> private constructor(
+class TemporalItem<T: Any>(
     val inner: T,
     @kotlinx.serialization.Serializable(with = OffsetDateTimeNullableSerializer::class)
     val createdAt: OffsetDateTime?,
@@ -51,7 +51,7 @@ class TemporalItem<T: Any> private constructor(
     }
 
     override fun equals(other: Any?): Boolean {
-        return inner == other
+        return this === other || inner == other || (other is TemporalItem<*> && inner == other.inner)
     }
 
     companion object {
