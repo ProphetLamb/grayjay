@@ -10,21 +10,18 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.futo.platformplayer.*
-import com.futo.platformplayer.downloads.VideoDownload
-import com.futo.platformplayer.downloads.VideoLocal
+import com.futo.platformplayer.R
 import com.futo.platformplayer.logging.Logger
 import com.futo.platformplayer.models.Playlist
 import com.futo.platformplayer.states.StateDownloads
-import com.futo.platformplayer.states.StatePlayer
 import com.futo.platformplayer.states.StatePlaylists
-import com.futo.platformplayer.views.AnyInsertedAdapterView
-import com.futo.platformplayer.views.AnyInsertedAdapterView.Companion.asAnyWithTop
-import com.futo.platformplayer.views.others.ProgressBar
-import com.futo.platformplayer.views.adapters.viewholders.VideoDownloadViewHolder
+import com.futo.platformplayer.toHumanBytesSize
+import com.futo.platformplayer.views.adapters.VideoDownloadAdapter
 import com.futo.platformplayer.views.items.ActiveDownloadItem
 import com.futo.platformplayer.views.items.PlaylistDownloadItem
+import com.futo.platformplayer.views.others.ProgressBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -47,7 +44,7 @@ class DownloadsFragment : MainFragment() {
         super.onResume()
         _view?.reloadUI();
 
-        StateDownloads.instance.onDownloadsChanged.subscribe(this) {
+        val reloadUiScoped = {
             lifecycleScope.launch(Dispatchers.Main) {
                 try {
                     Logger.i(TAG, "Reloading UI for downloads");
@@ -56,27 +53,11 @@ class DownloadsFragment : MainFragment() {
                     Logger.e(TAG, "Failed to reload UI for downloads", e)
                 }
             }
-        };
-        StateDownloads.instance.onDownloadedChanged.subscribe(this) {
-            lifecycleScope.launch(Dispatchers.Main) {
-                try {
-                    Logger.i(TAG, "Reloading UI for downloaded");
-                    _view?.reloadUI();
-                } catch (e: Throwable) {
-                    Logger.e(TAG, "Failed to reload UI for downloaded", e)
-                }
-            }
-        };
-        StateDownloads.instance.onExportsChanged.subscribe(this) {
-            lifecycleScope.launch(Dispatchers.Main) {
-                try {
-                    Logger.i(TAG, "Reloading UI for exports");
-                    _view?.reloadUI()
-                } catch (e: Throwable) {
-                    Logger.e(TAG, "Failed to reload UI for exports", e)
-                }
-            }
-        };
+        }
+
+        StateDownloads.instance.onDownloadsChanged.subscribe(this) { reloadUiScoped() };
+        StateDownloads.instance.onDownloadedChanged.subscribe(this) { reloadUiScoped() };
+        StateDownloads.instance.onExportsChanged.subscribe(this) { reloadUiScoped() };
     }
 
     override fun onPause() {
@@ -87,9 +68,10 @@ class DownloadsFragment : MainFragment() {
         StateDownloads.instance.onExportsChanged.remove(this);
     }
 
-    private class DownloadsView : LinearLayout {
+    private class DownloadsView(frag: DownloadsFragment, inflater: LayoutInflater) :
+        LinearLayout(frag.requireContext()) {
         private val TAG = "DownloadsView";
-        private val _frag: DownloadsFragment;
+        private val _frag: DownloadsFragment = frag;
 
         private val _usageUsed: TextView;
         private val _usageAvailable: TextView;
@@ -106,35 +88,28 @@ class DownloadsFragment : MainFragment() {
         private val _listDownloadedHeader: LinearLayout;
         private val _listDownloadedMeta: TextView;
         private val _listDownloadsFilterContainer: LinearLayout
-        private val _listDownloaded: AnyInsertedAdapterView<VideoLocal, VideoDownloadViewHolder>;
+        private val _listDownloaded: VideoDownloadAdapter
 
-        var sortBy = 0;
-
-        constructor(frag: DownloadsFragment, inflater: LayoutInflater): super(frag.requireContext()) {
-            inflater.inflate(R.layout.fragment_downloads, this, true);
-            _frag = frag;
-
-            _usageUsed = findViewById(R.id.downloads_usage_used);
-            _usageAvailable = findViewById(R.id.downloads_usage_available);
-            _usageProgress = findViewById(R.id.downloads_usage_progress);
-
-            _listActiveDownloadsContainer = findViewById(R.id.downloads_active_downloads_container);
-            _listActiveDownloadsMeta = findViewById(R.id.downloads_active_downloads_meta);
-            _listActiveDownloads = findViewById(R.id.downloads_active_downloads_list);
-
-            _listPlaylistsContainer = findViewById(R.id.downloads_playlist_container);
-            _listPlaylistsMeta = findViewById(R.id.downloads_playlist_meta);
-            _listPlaylists = findViewById(R.id.downloads_playlist_list);
-
-            _listDownloadedHeader = findViewById(R.id.downloads_videos_header);
-            _listDownloadedMeta = findViewById(R.id.downloads_videos_meta);
+        init {
+            inflater.inflate(R.layout.fragment_downloads, this, true)
+            _usageUsed = findViewById(R.id.downloads_usage_used)
+            _usageAvailable = findViewById(R.id.downloads_usage_available)
+            _usageProgress = findViewById(R.id.downloads_usage_progress)
+            _listActiveDownloadsContainer = findViewById(R.id.downloads_active_downloads_container)
+            _listActiveDownloadsMeta = findViewById(R.id.downloads_active_downloads_meta)
+            _listActiveDownloads = findViewById(R.id.downloads_active_downloads_list)
+            _listPlaylistsContainer = findViewById(R.id.downloads_playlist_container)
+            _listPlaylistsMeta = findViewById(R.id.downloads_playlist_meta)
+            _listPlaylists = findViewById(R.id.downloads_playlist_list)
+            _listDownloadedHeader = findViewById(R.id.downloads_videos_header)
+            _listDownloadedMeta = findViewById(R.id.downloads_videos_meta)
             _listDownloadsFilterContainer = findViewById(R.id.downloads_videos_filter_container)
-
+            _listDownloaded = VideoDownloadAdapter(_frag, inflater)
             val spinnerSortBy: Spinner = findViewById(R.id.spinner_sortby)
             spinnerSortBy.adapter = ArrayAdapter(context, R.layout.spinner_item_simple, resources.getStringArray(R.array.downloads_sortby_array)).also {
                 it.setDropDownViewResource(R.layout.spinner_dropdownitem_simple)
             }
-            spinnerSortBy.setSelection(sortBy)
+            spinnerSortBy.setSelection(_listDownloaded.sortBy)
             spinnerSortBy.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(
                     parent: AdapterView<*>?,
@@ -142,24 +117,16 @@ class DownloadsFragment : MainFragment() {
                     position: Int,
                     id: Long
                 ) {
-                    sortBy = position
-                    reloadUI() // HACK move this shit to an adapter
+                    _listDownloaded.sortBy = position
                 }
 
                 override fun onNothingSelected(parent: AdapterView<*>?) { }
-            };
-
-            _listDownloaded = findViewById<RecyclerView>(R.id.list_downloaded)
-                .asAnyWithTop(findViewById(R.id.downloads_top)) {
-                    it.onClick.subscribe {
-                        StatePlayer.instance.clearQueue();
-                        _frag.navigate<VideoDetailFragment>(it).maximizeVideoDetail();
-                    }
-                };
-
-            reloadUI();
+            }
+            val listDownloadsView = findViewById<RecyclerView>(R.id.list_downloaded);
+            listDownloadsView.adapter = _listDownloaded
+            listDownloadsView.layoutManager = LinearLayoutManager(context)
+            reloadUI()
         }
-
 
         fun reloadUI() {
             val usage = StateDownloads.instance.getTotalUsage(true);
@@ -167,19 +134,9 @@ class DownloadsFragment : MainFragment() {
             _usageAvailable.text = "${usage.available.toHumanBytesSize()} " + context.getString(R.string.available);
             _usageProgress.progress = usage.percentage.toFloat();
 
-
             val activeDownloads = StateDownloads.instance.getDownloading();
             val playlists = StateDownloads.instance.getCachedPlaylists();
             val watchLaterDownload = StateDownloads.instance.getWatchLaterDescriptor();
-            val downloadedUnordered = StateDownloads.instance.getDownloadedVideosTemporal()
-                .filter { it.inner.groupType != VideoDownload.GROUP_PLAYLIST || it.inner.groupID == null || !StateDownloads.instance.hasCachedPlaylist(it.inner.groupID!!) };
-            val downloaded = when (sortBy) {
-                0 -> downloadedUnordered.sortedByDescending { it.createdAt }
-                1 -> downloadedUnordered.sortedBy { it.createdAt }
-                2 -> downloadedUnordered.sortedBy { it.inner.name }
-                3 -> downloadedUnordered.sortedByDescending { it.inner.name }
-                else -> throw IllegalStateException("Invalid sorting algorithm selected.")
-            }.map { it.inner }
 
             if(activeDownloads.isEmpty())
                 _listActiveDownloadsContainer.visibility = GONE;
@@ -219,16 +176,16 @@ class DownloadsFragment : MainFragment() {
                 }
             }
 
-            if(downloaded.isEmpty()) {
+            if(_listDownloaded.itemCount == 0) {
                 _listDownloadedHeader.visibility = GONE;
                 _listDownloadsFilterContainer.visibility = GONE;
             } else {
                 _listDownloadedHeader.visibility = VISIBLE;
                 _listDownloadsFilterContainer.visibility = VISIBLE;
-                _listDownloadedMeta.text = "(${downloaded.size} ${context.getString(R.string.videos).lowercase()})";
-            }
 
-            _listDownloaded.setData(downloaded);
+                val countText = if (_listDownloaded.sourceCount == _listDownloaded.itemCount) "${_listDownloaded.sourceCount}" else "${_listDownloaded.sourceCount} / ${_listDownloaded.itemCount}";
+                _listDownloadedMeta.text = "(${countText} ${context.getString(R.string.videos).lowercase()})";
+            }
         }
     }
 }
