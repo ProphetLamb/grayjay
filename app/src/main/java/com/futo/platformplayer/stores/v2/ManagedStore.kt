@@ -359,7 +359,7 @@ class ManagedStore<T>{
     }
 
     /**
-     * Consumes all items from `oldStore`, and adds them to this store.
+     * Consumes all items from `source`, and adds them to this store.
      *
      * Removes elements from the `source` store.
      * Adds elements to this store.

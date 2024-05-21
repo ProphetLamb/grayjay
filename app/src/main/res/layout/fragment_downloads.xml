@@ -82,16 +82,16 @@
                     android:scaleType="fitCenter"
                     android:background="@drawable/edit_text_background" />
         </LinearLayout>
+
         <LinearLayout
                 android:id="@+id/container_storage_info"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:backgroundTint="#333333"
-                android:background="@drawable/rounded_square_outline"
+                android:background="@drawable/background_16_round_4dp"
                 android:padding="8dp"
-                android:layout_marginVertical="8dp"
-                >
+                android:layout_marginVertical="8dp">
 
             <TextView
                     android:layout_width="match_parent"

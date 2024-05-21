@@ -101,12 +101,15 @@ class DownloadsFragment : MainFragment() {
             listDownloadsView.layoutManager = LinearLayoutManager(context)
             reloadUI()
 
-            _toggleStorageInfo.setOnClickListener {
+            val toggleStorageInfo = {
                 val toggled = !_toggleStorageInfoActive
                 _toggleStorageInfoActive = toggled
                 _containerStorageInfo.visibility = if (toggled) VISIBLE else GONE
             }
-            _toggleStorageInfo.callOnClick()
+
+            _toggleStorageInfo.setOnClickListener { toggleStorageInfo() }
+            _containerStorageInfo.setOnClickListener { toggleStorageInfo() }
+            toggleStorageInfo()
 
             _editSearch.addTextChangedListener {
                 _clearSearch.visibility = if (it.isNullOrBlank()) View.GONE else View.VISIBLE
