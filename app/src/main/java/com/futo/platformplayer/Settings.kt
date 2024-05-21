@@ -502,6 +502,10 @@ class Settings : FragmentedStorageFileJson() {
         fun getByteRangeThreadCount(): Int {
             return threadIndexToCount(byteRangeConcurrency);
         }
+
+        @FormField(R.string.auto_export_downloads, FieldForm.TOGGLE, R.string.downloaded_videos_are_immediately_externally_available, 6)
+        @Serializable(with = FlexibleBooleanSerializer::class)
+        var autoExportDownloads: Boolean = true;
     }
 
     @FormField(R.string.browsing, "group", R.string.configure_browsing_behavior, 8)

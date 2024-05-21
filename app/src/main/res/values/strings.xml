@@ -928,4 +928,6 @@
         <item>Within 30 seconds of loss</item>
         <item>Always</item>
     </string-array>
+    <string name="auto_export_downloads">Export downloads automatically</string>
+    <string name="downloaded_videos_are_immediately_externally_available">Downloaded videos are immediately externally available. Copy downloaded videos to the external download directory upon completion.</string>
 </resources>
