@@ -50,17 +50,13 @@ class VideoDownloadViewHolder(_viewGroup: ViewGroup) : AnyAdapter.AnyViewHolder<
         }
         _videoExport.setOnClickListener {
             val v = _video ?: return@setOnClickListener;
-            if (StateApp.instance.getExternalDownloadDirectory(_view.context) == null) {
-                StateApp.instance.changeExternalDownloadDirectory(_view.context as MainActivity) {
-                    if (it == null) {
-                        UIDialogs.toast(_view.context, "Download directory must be set to export.");
-                        return@changeExternalDownloadDirectory;
-                    }
-
-                    StateDownloads.instance.export(v, v.videoSource.firstOrNull(), v.audioSource.firstOrNull(), v.subtitlesSources.firstOrNull());
-                };
-            } else {
-                StateDownloads.instance.export(v, v.videoSource.firstOrNull(), v.audioSource.firstOrNull(), v.subtitlesSources.firstOrNull());
+            val exportVideo = {
+                StateDownloads.instance.export(v, v.videoSource.firstOrNull(), v.audioSource.firstOrNull(), v.subtitlesSources.firstOrNull())
+            }
+            if (!StateApp.instance.configureInitialExternalDownloadDirectoryAndAutoExport(_view.context as MainActivity) {
+                exportVideo()
+            }) {
+                exportVideo()
             }
         }
     }
