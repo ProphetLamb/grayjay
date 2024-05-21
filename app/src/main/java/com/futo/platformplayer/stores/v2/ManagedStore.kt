@@ -4,6 +4,7 @@ import com.futo.platformplayer.assume
 import com.futo.platformplayer.logging.Logger
 import com.futo.platformplayer.models.ImportCache
 import com.futo.platformplayer.states.StateApp
+import com.futo.polycentric.core.AggregateException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.KSerializer
@@ -284,10 +285,14 @@ class ManagedStore<T>{
     }
 
     fun delete(item: T) {
+        delete(item, true)
+    }
+
+    fun delete(item: T, onDelete: Boolean) {
         synchronized(_files) {
             val file = _files[item];
             if(file != null) {
-                if(item is IStoreItem)
+                if(onDelete && item is IStoreItem)
                     item.onDelete();
                 _files.remove(item);
                 Logger.v(TAG, "Deleting file ${logName(file.id)}");
@@ -295,6 +300,7 @@ class ManagedStore<T>{
             }
         }
     }
+
     fun deleteAll() {
         synchronized(_files) {
             val keys = _files.keys.toList();
@@ -350,6 +356,31 @@ class ManagedStore<T>{
     fun isReconstructionHeader(recon: String): Boolean {
         val identifier = getReconstructionIdentifier(recon);
         return identifier != null && isReconstructionIdentifier(identifier);
+    }
+
+    /**
+     * Consumes all items from `source`, and adds them to this store.
+     *
+     * Removes elements from the `source` store.
+     * Adds elements to this store.
+     * Does not call the `onDelete` function on `IStoreItem`s
+     */
+    fun<U> consume(source: ManagedStore<U>, transformation: (U) -> T) {
+        val exs = ArrayList<Throwable>()
+        for (item in source.getItems()) {
+            try {
+                save(transformation(item))
+                source.delete(item, false)
+            }
+            catch (t: Throwable) {
+                Logger.e(TAG, "migration of key failed", t)
+                exs.add(t)
+            }
+        }
+
+        if (exs.isNotEmpty()) {
+            throw AggregateException(exs)
+        }
     }
 
     class ManagedFile(

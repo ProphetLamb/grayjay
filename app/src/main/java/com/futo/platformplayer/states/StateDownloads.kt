@@ -17,6 +17,7 @@ import com.futo.platformplayer.api.media.models.streams.sources.SubtitleRawSourc
 import com.futo.platformplayer.api.media.models.subtitles.ISubtitleSource
 import com.futo.platformplayer.api.media.models.video.IPlatformVideo
 import com.futo.platformplayer.api.media.models.video.IPlatformVideoDetails
+import com.futo.platformplayer.api.media.structures.TemporalItem
 import com.futo.platformplayer.constructs.Event0
 import com.futo.platformplayer.downloads.PlaylistDownloadDescriptor
 import com.futo.platformplayer.downloads.VideoDownload
@@ -39,19 +40,24 @@ class StateDownloads {
     private val _downloadsDirectory: File = FragmentedStorage.getOrCreateDirectory("downloads");
     private val _downloadsStat = StatFs(_downloadsDirectory.absolutePath);
 
-    private val _downloaded = FragmentedStorage.storeJson<VideoLocal>("downloaded")
+    private val _downloaded = FragmentedStorage.storeJson<TemporalItem<VideoLocal>>("downloaded-v2")
         .load()
-        .apply { afterLoadingDownloaded(this) };
-    private val _downloading = FragmentedStorage.storeJson<VideoDownload>("downloading")
-        .load().apply {
+        .apply { this.consume(FragmentedStorage.storeJson<VideoLocal>("downloaded").load()) { TemporalItem.now(it) } }
+        .apply { afterLoadingDownloaded(this) }
+    private val _downloading = FragmentedStorage.storeJson<TemporalItem<VideoDownload>>("downloading-v2")
+        .load()
+        .apply { this.consume(FragmentedStorage.storeJson<VideoDownload>("downloading").load()) { TemporalItem.now(it) } }
+        .apply {
             for(video in this.getItems())
-                video.changeState(VideoDownload.State.QUEUED);
+                video.inner.changeState(VideoDownload.State.QUEUED);
         };
-    private val _downloadPlaylists = FragmentedStorage.storeJson<PlaylistDownloadDescriptor>("playlistDownloads")
-        .load();
+    private val _downloadPlaylists = FragmentedStorage.storeJson<TemporalItem<PlaylistDownloadDescriptor>>("playlistDownloads-v2")
+        .load()
+        .apply { this.consume(FragmentedStorage.storeJson<PlaylistDownloadDescriptor>("playlistDownloads").load()) { TemporalItem.now(it) } };
 
-    private val _exporting = FragmentedStorage.storeJson<VideoExport>("exporting")
-        .load();
+    private val _exporting = FragmentedStorage.storeJson<TemporalItem<VideoExport>>("exporting-v2")
+        .load()
+        .apply { this.consume(FragmentedStorage.storeJson<VideoExport>("exporting").load()) { TemporalItem.now(it) } };
 
     private lateinit var _downloadedSet: HashSet<PlatformID>;
 
@@ -59,8 +65,8 @@ class StateDownloads {
     val onDownloadsChanged = Event0();
     val onDownloadedChanged = Event0();
 
-    private fun afterLoadingDownloaded(v: ManagedStore<VideoLocal>) {
-        _downloadedSet = HashSet(v.getItems().map { it.id });
+    private fun afterLoadingDownloaded(v: ManagedStore<TemporalItem<VideoLocal>>) {
+        _downloadedSet = HashSet(v.getItems().map { it.inner.id });
     }
 
     fun getTotalUsage(reload: Boolean): DiskUsage {
@@ -72,16 +78,20 @@ class StateDownloads {
     }
 
     fun getCachedVideo(id: PlatformID): VideoLocal? {
-        return _downloaded.findItem  { it.id.equals(id) };
+        return getCachedVideoTemporal(id)?.inner;
+    }
+    fun getCachedVideoTemporal(id: PlatformID): TemporalItem<VideoLocal>? {
+        return _downloaded.findItem  { it.inner.id == id };
     }
     fun updateCachedVideo(vid: VideoLocal) {
         Logger.i("StateDownloads", "Updating local video ${vid.name}");
-        _downloaded.save(vid);
+
+        _downloaded.save(TemporalItem.now(vid));
         onDownloadedChanged.emit();
     }
     fun deleteCachedVideo(id: PlatformID) {
         Logger.i("StateDownloads", "Deleting local video ${id.value}");
-        val downloaded = getCachedVideo(id);
+        val downloaded = getCachedVideoTemporal(id);
         if(downloaded != null) {
             synchronized(_downloadedSet) {
                 _downloadedSet.remove(id);
@@ -98,33 +108,42 @@ class StateDownloads {
     }
 
     fun getWatchLaterDescriptor(): PlaylistDownloadDescriptor? {
-        return _downloadPlaylists.getItems().find { it.id == VideoDownload.GROUP_WATCHLATER };
+        return getWatchLaterDescriptorTemporal()?.inner;
+    }
+    fun getWatchLaterDescriptorTemporal(): TemporalItem<PlaylistDownloadDescriptor>? {
+        return _downloadPlaylists.getItems().find { it.inner.id == VideoDownload.GROUP_WATCHLATER };
     }
     fun getCachedPlaylists(): List<PlaylistDownloaded> {
+        return getCachedPlaylistsTemporal().map { it.inner }
+    }
+    fun getCachedPlaylistsTemporal(): List<TemporalItem<PlaylistDownloaded>> {
         return _downloadPlaylists.getItems()
-            .map { Pair(it, StatePlaylists.instance.getPlaylist(it.id)) }
+            .map { Pair(it, StatePlaylists.instance.getPlaylist(it.inner.id)) }
             .filter { it.second != null }
-            .map { PlaylistDownloaded(it.first, it.second!!) }
+            .map { TemporalItem(PlaylistDownloaded(it.first.inner, it.second!!), it.first.createdAt) }
             .toList();
     }
     fun hasCachedPlaylist(playlistId: String): Boolean {
-        return _downloadPlaylists.hasItem {  it.id == playlistId };
+        return _downloadPlaylists.hasItem {  it.inner.id == playlistId };
     }
     fun getCachedPlaylist(playlistId: String): PlaylistDownloaded? {
-        val descriptor = getPlaylistDownload(playlistId) ?: return null;
+        val descriptor = getPlaylistDownloadTemporal(playlistId) ?: return null;
         val playlist = StatePlaylists.instance.getPlaylist(playlistId) ?: return null;
-        return PlaylistDownloaded(descriptor, playlist);
+        return PlaylistDownloaded(descriptor.inner, playlist);
     }
     fun getPlaylistDownload(playlistId: String): PlaylistDownloadDescriptor? {
-        return _downloadPlaylists.findItem { it.id == playlistId };
+        return getPlaylistDownloadTemporal(playlistId)?.inner;
+    }
+    fun getPlaylistDownloadTemporal(playlistId: String): TemporalItem<PlaylistDownloadDescriptor>? {
+        return _downloadPlaylists.findItem { it.inner.id == playlistId };
     }
     fun savePlaylistDownload(playlistDownload: PlaylistDownloadDescriptor) {
         synchronized(playlistDownload.preventDownload) {
-            _downloadPlaylists.save(playlistDownload);
+            _downloadPlaylists.save(TemporalItem.now(playlistDownload));
         }
     }
     fun deleteCachedPlaylist(id: String) {
-        val pdl = getPlaylistDownload(id);
+        val pdl = getPlaylistDownloadTemporal(id);
         if(pdl != null)
             _downloadPlaylists.delete(pdl);
         if(id == VideoDownload.GROUP_WATCHLATER) {
@@ -142,14 +161,25 @@ class StateDownloads {
     }
 
     fun getDownloadedVideos(): List<VideoLocal> {
+        return getDownloadedVideosTemporal().sortedByDescending { it.createdAt }.map { it.inner }.toList();
+    }
+    fun getDownloadedVideosTemporal(): List<TemporalItem<VideoLocal>> {
         return _downloaded.getItems();
     }
+
     fun getDownloadedVideosPlaylist(str: String): List<VideoLocal> {
-        val videos = _downloaded.findItems { it.groupID == str };
+        return getDownloadedVideosPlaylistTemporal(str).sortedByDescending { it.createdAt }.map { it.inner }.toList()
+    }
+    fun getDownloadedVideosPlaylistTemporal(str: String): List<TemporalItem<VideoLocal>> {
+        val videos = _downloaded.findItems { it.inner.groupID == str };
         return videos;
     }
 
     fun getDownloadPlaylists(): List<PlaylistDownloadDescriptor> {
+        return getDownloadPlaylistsTemporal().map { it.inner }.toList();
+    }
+
+    fun getDownloadPlaylistsTemporal(): List<TemporalItem<PlaylistDownloadDescriptor>> {
         return _downloadPlaylists.getItems();
     }
 
@@ -158,16 +188,18 @@ class StateDownloads {
     }
 
     fun getDownloading(): List<VideoDownload> {
+        return getDownloadingTemporal().sortedByDescending { it.createdAt }.map { it.inner }.toList()
+    }
+    fun getDownloadingTemporal(): Iterable<TemporalItem<VideoDownload>> {
         return _downloading.getItems();
     }
     fun updateDownloading(download: VideoDownload) {
-        _downloading.save(download, false, true);
+        _downloading.save(TemporalItem.now(download), false, true);
     }
-
 
     fun removeDownload(download: VideoDownload) {
         download.isCancelled = true;
-        _downloading.delete(download);
+        _downloading.delete(TemporalItem.undefined(download));
         onDownloadsChanged.emit();
     }
     fun preventPlaylistDownload(download: VideoDownload) {
@@ -234,7 +266,7 @@ class StateDownloads {
         var hasNew = false;
         val watchLater = StatePlaylists.instance.getWatchLater();
         for(item in watchLater) {
-            val existing = getCachedVideo(item.id);
+            val existing = getCachedVideoTemporal(item.id);
 
             if(!playlistDownload.shouldDownload(item)) {
                 Logger.i(TAG, "Not downloading for watchlater [${playlistDownload.id}] Video [${item.name}]:${item.url}")
@@ -256,11 +288,11 @@ class StateDownloads {
             }
             else {
                 Logger.i(TAG, "New watchlater video (already downloaded) ${item.name}");
-                if(existing.groupID == null) {
-                    existing.groupID = VideoDownload.GROUP_WATCHLATER;
-                    existing.groupType = VideoDownload.GROUP_WATCHLATER;
+                if(existing.inner.groupID == null) {
+                    existing.inner.groupID = VideoDownload.GROUP_WATCHLATER;
+                    existing.inner.groupType = VideoDownload.GROUP_WATCHLATER;
                     synchronized(_downloadedSet) {
-                        _downloadedSet.add(existing.id);
+                        _downloadedSet.add(existing.inner.id);
                     }
                     _downloaded.save(existing);
                 }
@@ -279,7 +311,7 @@ class StateDownloads {
     fun continueDownload(playlistDownload: PlaylistDownloadDescriptor, playlist: Playlist) {
         var hasNew = false;
         for(item in playlist.videos) {
-            val existing = getCachedVideo(item.id);
+            val existing = getCachedVideoTemporal(item.id);
 
             if(!playlistDownload.shouldDownload(item)) {
                 Logger.i(TAG, "Not downloading for playlist [${playlistDownload.id}] Video [${item.name}]:${item.url}")
@@ -301,11 +333,11 @@ class StateDownloads {
             }
             else {
                 Logger.i(TAG, "New playlist video (already downloaded) ${item.name}");
-                if(existing.groupID == null) {
-                    existing.groupID = playlist.id;
-                    existing.groupType = VideoDownload.GROUP_PLAYLIST;
+                if(existing.inner.groupID == null) {
+                    existing.inner.groupID = playlist.id;
+                    existing.inner.groupType = VideoDownload.GROUP_PLAYLIST;
                     synchronized(_downloadedSet) {
-                        _downloadedSet.add(existing.id);
+                        _downloadedSet.add(existing.inner.id);
                     }
                     _downloaded.save(existing);
                 }
@@ -323,12 +355,12 @@ class StateDownloads {
     }
     fun downloadWatchLater(targetPixelCount: Long?, targetBitrate: Long?) {
         val playlistDownload = PlaylistDownloadDescriptor(VideoDownload.GROUP_WATCHLATER, targetPixelCount, targetBitrate);
-        _downloadPlaylists.save(playlistDownload);
+        _downloadPlaylists.save(TemporalItem.now(playlistDownload));
         continueDownloadWatchLater(playlistDownload);
     }
     fun download(playlist: Playlist, targetPixelcount: Long?, targetBitrate: Long?) {
         val playlistDownload = PlaylistDownloadDescriptor(playlist.id, targetPixelcount, targetBitrate);
-        _downloadPlaylists.save(playlistDownload);
+        _downloadPlaylists.save(TemporalItem.now(playlistDownload));
         continueDownload(playlistDownload, playlist);
     }
     fun download(video: IPlatformVideo, targetPixelcount: Long?, targetBitrate: Long?) {
@@ -346,7 +378,7 @@ class StateDownloads {
 
         try {
             validateDownload(videoState);
-            _downloading.save(videoState);
+            _downloading.save(TemporalItem.now(videoState));
 
 
             if(notify) {
@@ -376,7 +408,7 @@ class StateDownloads {
         }
     }
     private fun validateDownload(videoState: VideoDownload) {
-        if(_downloading.hasItem { it.videoEither.url == videoState.videoEither.url })
+        if(_downloading.hasItem { it.inner.videoEither.url == videoState.videoEither.url })
             throw IllegalStateException("Video [${videoState.name}] is already queued for dowload");
 
         val existing = getCachedVideo(videoState.id);
@@ -458,8 +490,8 @@ class StateDownloads {
         }
 
         try {
-            val currentDownloads = _downloaded.getItems().map { it.url }.toHashSet();
-            val exporting = _exporting.findItems { !currentDownloads.contains(it.videoLocal.url) };
+            val currentDownloads = _downloaded.getItems().map { it.inner.url }.toHashSet();
+            val exporting = _exporting.findItems { !currentDownloads.contains(it.inner.videoLocal.url) };
             for (export in exporting)
                 _exporting.delete(export);
         }
@@ -479,6 +511,9 @@ class StateDownloads {
 
     //Export
     fun getExporting(): List<VideoExport> {
+        return getExportingTemporal().map { it.inner }.toList();
+    }
+    fun getExportingTemporal():  List<TemporalItem<VideoExport>> {
         return _exporting.getItems();
     }
     fun checkForExportTodos() {
@@ -490,7 +525,7 @@ class StateDownloads {
     }
 
     fun validateExport(export: VideoExport) {
-        if(_exporting.hasItem { it.videoLocal.url == export.videoLocal.url })
+        if(_exporting.hasItem { it.inner.videoLocal.url == export.videoLocal.url })
             throw AlreadyQueuedException("Video [${export.videoLocal.name}] is already queued for export");
     }
     fun export(videoLocal: VideoLocal, videoSource: LocalVideoSource?, audioSource: LocalAudioSource?, subtitleSource: LocalSubtitleSource?, notify: Boolean = true) {
@@ -503,7 +538,7 @@ class StateDownloads {
 
         try {
             validateExport(videoExport);
-            _exporting.save(videoExport);
+            _exporting.save(TemporalItem.now(videoExport));
 
             if(notify) {
                 UIDialogs.toast("Exporting [${shortName}]");
@@ -528,9 +563,8 @@ class StateDownloads {
         }
     }
 
-
     fun removeExport(export: VideoExport) {
-        _exporting.delete(export);
+        _exporting.delete(TemporalItem.undefined(export));
         export.isCancelled = true;
         onExportsChanged.emit();
     }
