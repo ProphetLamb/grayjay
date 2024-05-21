@@ -928,6 +928,15 @@
         <item>Within 30 seconds of loss</item>
         <item>Always</item>
     </string-array>
-    <string name="auto_export_downloads">Export downloads automatically</string>
+    <string name="auto_export_downloads">Export Downloads Automatically</string>
     <string name="downloaded_videos_are_immediately_externally_available">Downloaded videos are immediately externally available. Copy downloaded videos to the external download directory upon completion.</string>
+    <string name="export_downloads">Export Downloads</string>
+    <string name="choose_the_directory_to_export_downloads">Choose the directory to export downloads. This directory is used to export downloads to for external usage.</string>
+    <string name="cancel_to_disable_automatic_export_of_downloads">Cancel to disable automatic export of downloads.</string>
+    <string name="no_access_granted">No access granted</string>
+    <string name="disabled_automatic_download_export">Disabled automatic download export</string>
+    <string name="general_files">General Files</string>
+    <string name="choose_the_directory_for_general_files">Choose the directory for general files. This directory is used to save auto-backups and other persistent files.</string>
+    <string name="this_directory_is_used_as_grayjay_backup_directory">This directory is used as Grayjay backup directory. Allows restoring of a backup</string>
+    <string name="grayjay_backup_directory">Hrayjay Backup Directory</string>
 </resources>

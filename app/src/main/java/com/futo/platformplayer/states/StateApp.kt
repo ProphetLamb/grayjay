@@ -65,10 +65,13 @@ class StateApp {
     }
     fun changeExternalGeneralDirectory(context: IWithResultLauncher, onChanged: ((DocumentFile?)->Unit)? = null) {
         if(context is Context)
-            requestDirectoryAccess(context, "General Files", "This directory is used to save auto-backups and other persistent files.", null) {
-                if(it != null)
-                    context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_WRITE_URI_PERMISSION.or(Intent.FLAG_GRANT_READ_URI_PERMISSION));
-                if(it != null && isValidStorageUri(context, it)) {
+            requestDirectoryAccess(
+                context,
+                context.getString(R.string.general_files),
+                context.getString(R.string.choose_the_directory_for_general_files)) {
+                context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_WRITE_URI_PERMISSION.or(Intent.FLAG_GRANT_READ_URI_PERMISSION));
+
+                if(isValidStorageUri(context, it)) {
                     Logger.i(TAG, "Changed external general directory: ${it}");
                     Settings.instance.storage.storage_general = it.toString();
                     Settings.instance.save();
@@ -77,7 +80,7 @@ class StateApp {
                 }
                 else
                     scopeOrNull?.launch(Dispatchers.Main) {
-                        UIDialogs.toast("Failed to gain access to\n [${it?.lastPathSegment}]");
+                        UIDialogs.toast("${context.getString(R.string.no_access_granted)}\n [${it?.lastPathSegment}]");
                     };
             };
     }
@@ -87,20 +90,102 @@ class StateApp {
             return DocumentFile.fromTreeUri(context, downloadUri!!);
         return null;
     }
-    fun changeExternalDownloadDirectory(context: IWithResultLauncher, onChanged: ((DocumentFile?)->Unit)? = null) {
-        if(context is Context)
-            requestDirectoryAccess(context, "Download Exports", "This directory is used to export downloads to for external usage.", null) {
-                if(it != null)
-                    context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_WRITE_URI_PERMISSION.or(Intent.FLAG_GRANT_READ_URI_PERMISSION));
-                if(it != null && isValidStorageUri(context, it)) {
-                    Logger.i(TAG, "Changed external download directory: ${it}");
-                    Settings.instance.storage.storage_download = it.toString();
-                    Settings.instance.save();
 
-                    onChanged?.invoke(getExternalDownloadDirectory(context));
-                }
-            };
+    /**
+     * Configures `Settings.instance.storage.storage_download` if not already configured
+     * @param onFail called if the directory needs to be configured, but was not
+     * @return `false` if already configured, otherwise `true`
+     */
+    fun configureInitialExternalDownloadDirectoryAndAutoExport(
+        context: IWithResultLauncher,
+        onFail: ((Int) -> String?)? = null,
+        onConfigure: ((DocumentFile?) -> Unit)? = null
+    ): Boolean {
+        if (!Settings.instance.storage.storage_download.isNullOrBlank()) {
+            Logger.i(TAG, "Auto export downloads directory is already configured")
+            return false
+        }
+        if (Settings.instance.downloads.autoExportDownloads) {
+            changeExternalDownloadDirectoryOrDisableAutoExport(context, onFail, onConfigure)
+        } else {
+            changeExternalDownloadDirectory(context, onFail, onConfigure)
+        }
+        return true
     }
+
+    fun changeExternalDownloadDirectory(context: IWithResultLauncher,
+        onFail: ((Int) -> String?)? = null,
+        onChanged: ((DocumentFile?)->Unit)? = null
+    ) {
+        if(context !is Context) {
+            return
+        }
+        requestDirectoryAccess(
+            context,
+            context.getString(R.string.export_downloads),
+            context.getString(R.string.choose_the_directory_to_export_downloads),
+            fail = onFail
+        ) {
+            context.contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION.or(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            );
+            if (isValidStorageUri(context, it)) {
+                Logger.i(TAG, "Changed external download directory: ${it}");
+                Settings.instance.storage.storage_download = it.toString();
+                Settings.instance.save();
+
+                onChanged?.invoke(getExternalDownloadDirectory(context));
+            }
+        };
+    }
+
+    fun changeExternalDownloadDirectoryOrDisableAutoExport(
+        context: IWithResultLauncher,
+        onFail: ((Int) -> String?)? = null,
+        onConfigure: ((DocumentFile?) -> Unit)? = null
+    ) {
+        if(context !is Context) {
+            return
+        }
+        val fail: (Int) -> String? = {
+            Logger.i(TAG, "Disabling automatic exporting of downloads");
+            Settings.instance.downloads.autoExportDownloads = false
+            Settings.instance.save()
+            if (onFail == null)
+                context.getString(R.string.disabled_automatic_download_export)
+            else
+                onFail(it)
+        }
+        requestDirectoryAccess(
+            context,
+            context.getString(R.string.auto_export_downloads),
+            "${context.getString(R.string.cancel_to_disable_automatic_export_of_downloads)}\n${
+                context.getString(
+                    R.string.choose_the_directory_to_export_downloads
+                )
+            }", fail = fail
+        ) {
+            context.contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION.or(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            );
+            if (isValidStorageUri(context, it)) {
+                Logger.i(TAG, "Changed external download directory: ${it}");
+                Settings.instance.storage.storage_download = it.toString();
+                Settings.instance.save();
+
+                onConfigure?.invoke(getExternalDownloadDirectory(context));
+            } else {
+                UIDialogs.showDialogOk(
+                    context,
+                    R.drawable.ic_security_pred,
+                    context.getString(R.string.disabled_automatic_download_export)
+                );
+            }
+        };
+    }
+
     fun isValidStorageUri(context: Context, uri: Uri?): Boolean {
         if(uri == null)
             return false;
@@ -261,30 +346,39 @@ class StateApp {
             };
         }
     }
-    fun requestDirectoryAccess(activity: IWithResultLauncher, name: String, purpose: String? = null, path: Uri?, handle: (Uri?)->Unit)
+    fun requestDirectoryAccess(
+        activity: IWithResultLauncher,
+        name: String,
+        purpose: String? = null,
+        path: Uri? = null,
+        fail: ((Int) -> String?)? = null,
+        accept: (Uri)->Unit)
     {
-        if(activity is Context)
-        {
-            UIDialogs.showDialog(activity, R.drawable.ic_security, "Directory required for\n${name}", "Please select a directory for ${name}.\n${purpose}".trim(), null, 0,
-                UIDialogs.Action("Cancel", {}),
-                UIDialogs.Action("Ok", {
-                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                    if(path != null)
-                        intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, path);
-                    intent.flags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                        .or(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        .or(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-                        .or(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        if (activity !is Context) return
 
-                    activity.launchForResult(intent, 99) {
-                        if(it.resultCode == Activity.RESULT_OK) {
-                            handle(it.data?.data);
+        UIDialogs.showDialog(activity, R.drawable.ic_security, name, purpose, null, 0,
+            UIDialogs.Action(context.getString(R.string.cancel), {}),
+            UIDialogs.Action(context.getString(R.string.ok), {
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                if(path != null)
+                    intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, path);
+                intent.flags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    .or(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    .or(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                    .or(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+
+                activity.launchForResult(intent, 99) {
+                    val data = it.data?.data
+                    if (it.resultCode == Activity.RESULT_OK && data is Uri) {
+                        accept(data);
+                    } else {
+                        val errorText =  fail?.invoke(it.resultCode) ?: context.getString(R.string.no_access_granted)
+                        if (errorText.isNotBlank()) {
+                            UIDialogs.showDialogOk(context, R.drawable.ic_security_pred, errorText);
                         }
-                        else
-                            UIDialogs.showDialogOk(context, R.drawable.ic_security_pred, "No access granted");
-                    };
-                }, UIDialogs.ActionStyle.PRIMARY));
-        }
+                    }
+                };
+            }, UIDialogs.ActionStyle.PRIMARY));
     }
 
     //Lifecycle

@@ -158,16 +158,12 @@ class StateBackup {
                     else if(StateApp.instance.isMainActive)
                         StateApp.instance.contextOrNull;
                     else null;
-                    if(activity != null) {
-                        if(activity is IWithResultLauncher)
-                            StateApp.instance.requestDirectoryAccess(activity, "Grayjay Backup Directory", "Allows restoring of a backup", backupFiles.first?.parentFile?.uri) {
-                                if(it != null) {
-                                    val customFiles = StateBackup.getAutomaticBackupDocumentFiles(activity);
-                                    if(customFiles.first != null && customFiles.first!!.isFile && customFiles.first!!.exists() && customFiles.first!!.canRead())
-                                        restoreAutomaticBackup(context, scope, password, ifExists);
-                                }
-                            };
-                    }
+                    if(activity is IWithResultLauncher)
+                        StateApp.instance.requestDirectoryAccess(activity, context.getString(R.string.grayjay_backup_directory), context.getString(R.string.this_directory_is_used_as_grayjay_backup_directory), backupFiles.first?.parentFile?.uri) {
+                            val customFiles = getAutomaticBackupDocumentFiles(activity);
+                            if(customFiles.first != null && customFiles.first!!.isFile && customFiles.first!!.exists() && customFiles.first!!.canRead())
+                                restoreAutomaticBackup(context, scope, password, ifExists);
+                        }
                 }
                 catch (ex: Throwable) {
                     Logger.e(TAG, "Failed main AutoBackup restore", ex)
